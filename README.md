@@ -49,4 +49,4 @@ Rather than relying on static spreadsheets, every table, chart, and insight in t
 **Humberto Renteria**  
 Financial & Data Analyst passionate about turning complex financial data into clear, actionable insights.
 
-📧 [your@email.com] · 💼 [LinkedIn URL] · 🌐 [Portfolio URL]
+📧 [humberto.hernandez.renteria@hmail.com] · 💼 [[LinkedIn URL](https://www.linkedin.com/in/humberto-hern%C3%A1ndez-renter%C3%ADa-bb8147a3/)] 
