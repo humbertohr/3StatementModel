@@ -1,0 +1,1301 @@
+---
+title: "3 Statement Model"
+author: ""
+date: "2025-11-03"
+output:
+  pdf_document:
+    latex_engine: xelatex
+mainfont: "Lato"
+sansfont: "Lato"
+monofont: "Consolas"
+header-includes:
+  - \usepackage{sectsty}
+  - \sectionfont{\fontsize{14}{16}\selectfont}
+  - \renewcommand{\maketitle}{
+      \begin{center}
+      {\Huge\bfseries 3 Statement Model}\\[1ex]
+      {\large November 3, 2025}
+      \end{center}
+    }
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(janitor)
+library(ggplot2)
+library(stringr)
+library(scales)
+library(knitr)
+library(kableExtra)
+library(DT)
+library(flextable)
+
+# Step 1: Read the CSV, skipping the title row
+income_s <- read_csv("statement_fin.csv", skip = 1, n_max = 10, show_col_types = FALSE) %>%
+  remove_empty("cols") %>%             # remove any blank columns
+  clean_names()                        # clean column names (safe renaming)
+
+# Step 2: Keep only the first 6 columns (A–G → Item + 2024–2028)
+income_s <- income_s %>% select(1:6)
+
+# Step 3: Rename columns manually
+colnames(income_s) <- c("Item", "2024", "2025", "2026", "2027", "2028")
+
+table_income <- income_s %>%
+  mutate(across(everything(), as.character)) %>%
+  bind_rows(setNames(as.list(colnames(income_s)), colnames(income_s)), .) %>%
+  rename(Years = Item)
+
+table_income[1, 1] <- "Years"
+
+# Step 4: Convert to long format
+income_long <- income_s %>%
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "Year",
+    values_to = "Value"
+  )
+
+margin_data <- income_long %>%
+  filter(Item %in% c("Revenue", "Net Income")) %>%
+  pivot_wider(names_from = Item, values_from = Value) %>%
+  mutate(Profit_Margin = (`Net Income` / Revenue) * 100)
+
+```
+
+\vspace{1cm}
+
+\begin{center}
+\includegraphics[width=0.8\textwidth]{humberto_renteria_logo.png}
+\end{center}
+
+\vspace{1cm}
+
+This report presents a comprehensive visualization of a **3-Statement Financial Model**, which integrates the **Income Statement, Balance Sheet**, and **Cash Flow Statement** for the forecast period 2024–2028.
+
+The purpose of this document is to translate financial data into interactive insights using R and ggplot2.
+By visualizing trends in profitability, liquidity, capital structure, and cash generation, decision-makers can better understand the company’s performance trajectory and make informed strategic decisions.
+
+\vspace{1cm}
+
+**Purpose of the Visualizations**
+
+The charts created from this model serve four main analytical goals:
+
+1. **Profitability Analysis** – Visualizing revenue, COGS, and net income trends highlights gross margins and operating efficiency.
+
+2. **Liquidity Management** – Cash flow and ending cash balance visualizations reveal how operational performance and capital expenditures affect liquidity.
+
+3. **Capital Allocation** – Balance sheet charts show the evolution of assets, liabilities, and equity, allowing analysis of leverage and solvency.
+
+4. **Forecast Validation** – By visualizing assumptions (growth rates, cost percentages, and tax rates), you can assess the realism and sensitivity of financial projections.
+
+\newpage
+
+## Income Statement Analysis and Financial Performance Trends
+
+This section visualizes the main components of the Income Statement (2024–2028), showing how revenue growth, operating efficiency, and net profitability evolve over time. The charts help identify key financial drivers and provide a clearer view of the company’s performance trends.
+
+```{r cars, echo = FALSE, warning= FALSE}
+# Format and show the Income Statement table
+
+table_income %>%
+  mutate(
+    across(
+      c(`2024`, `2025`, `2026`, `2027`, `2028`),
+      ~ ifelse(!is.na(as.numeric(.)), dollar(as.numeric(.), accuracy = 1), .)
+    )
+  ) %>%
+  slice(-1) %>% 
+  flextable() %>%
+  set_caption("Income Statement (2024–2028)") %>%
+  theme_vanilla() %>%
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  align(align = "right", part = "body") %>%
+  fontsize(size = 9, part = "all") %>%
+  autofit()
+```
+
+The Income Statement summarizes the company’s projected financial performance from 2024 to 2028. It details the progression from total revenue through operating and non-operating expenses to derive net income. The steady increase in revenue and net income over the forecast period indicates consistent growth and improving profitability, supported by controlled operating expenses and stable margins.
+
+\newpage
+
+### Key Insights - Revenue vs Net Income Growth (2024–2028)
+
+* **Consistent Top-Line Expansion:**
+Revenue shows steady year-over-year growth, increasing from around $200 million in 2024 to nearly $250 million by 2028, reflecting healthy demand and pricing stability.
+
+* **Strong Bottom-Line Improvement:**
+Net Income also rises over the projection period, nearly doubling between 2024 and 2028, signaling improving profitability and operational leverage.
+
+* **Margin Expansion:**
+The gap between revenue and net income narrows slightly, indicating that the company is becoming more efficient in converting sales into profits—likely due to cost control and operating efficiency gains.
+
+* **Operational Efficiency in Focus:**
+The faster growth rate of Net Income relative to Revenue implies the company’s focus on cost optimization and margin improvement initiatives is yielding measurable results.
+
+* **Overall Outlook:**
+The trend demonstrates a sustainable growth trajectory, with both top-line and bottom-line moving in the same positive direction—an encouraging signal of balanced financial performance over the forecast horizon.
+
+```{r pressure, echo=FALSE, warning=FALSE}
+income_long %>%
+  filter(Item %in% c("Revenue", "Net Income")) %>%
+  ggplot(aes(x = Year, y = Value, color = Item, group = Item)) +
+  geom_line(size = 1.3) +
+  geom_point(size = 3) +
+  scale_y_continuous(labels = dollar_format(prefix = "$", suffix = "M")) +  # Adds $ sign and "M" for millions
+  labs(
+    title = "Revenue vs Net Income Growth (2024–2028)",
+    y = "USD (millions)",
+    x = "Year",
+    color = "Financial Metric"  # Legend title
+  ) +
+  scale_color_manual(values = c("Revenue" = "#1F77B4", "Net Income" = "#2CA02C")) +  # Optional: custom colors
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+
+```
+
+\newpage
+
+### Key Insights - Revenue vs Profit Margin (2024–2028)
+
+* **Revenue Growth:** Revenue rises steadily from about $200M in 2024 to nearly $250M by 2028.
+
+* **Profitability Gains:** Profit margin improves from ~17% to ~20%, showing stronger efficiency.
+
+* **Operational Leverage:** Higher revenue with rising margins indicates effective cost control.
+
+* **Margin Stability:** Margins level off after 2027, suggesting an optimized cost base.
+
+* **Overall:** Balanced growth with improving profitability and sustained financial health.
+
+```{r, echo=FALSE, warning=FALSE}
+
+ggplot(margin_data, aes(x = Year)) +
+  geom_col(aes(y = Revenue / 1000), fill = "#1F77B4", alpha = 0.6) +
+  geom_line(aes(y = Profit_Margin * 5, group = 1),
+            color = "#D62728", size = 1.3) +
+  geom_point(aes(y = Profit_Margin * 5),
+             color = "#D62728", size = 2.5) +
+  scale_y_continuous(
+    name = "Revenue (USD, millions)",
+    labels = dollar_format(prefix = "$", suffix = "M"),  # Left axis: dollar sign
+    sec.axis = sec_axis(~./5,
+                        name = "Profit Margin (%)",
+                        labels = percent_format(scale = 1))) +
+  
+  labs(title = "Revenue vs Profit Margin (2024–2028)", x = "Year") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title.y.right = element_text(color = "#D62728" , face = "bold"),
+    axis.title.y.left  = element_text(color = "#1F77B4", face = "bold")
+  )
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+margin_data %>%
+  mutate(
+    Revenue = dollar(as.numeric(Revenue), accuracy = 1),
+    `Net Income` = dollar(as.numeric(`Net Income`), accuracy = 1),
+    Profit_Margin = paste0(round(Profit_Margin, 2), "%")
+  ) %>%
+  flextable() %>%
+  set_caption("Profit Margin Analysis (2024–2028)") %>%
+  theme_vanilla() %>%
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  align(align = "right", part = "body") %>%
+  fontsize(size = 9, part = "all") %>%   # adjust font size
+  autofit()
+```
+
+\newpage
+
+### Key Insights - Expense Breakdown Over Time (2024–2028)
+
+1. **Overall Growth Trend**
+Total expenses are steadily increasing from 2024 to 2028, indicating either business expansion, rising production costs, or inflationary effects impacting operations.
+
+2. **COGS Dominates the Expense Structure**
+The Cost of Goods Sold (COGS) remains the largest component, accounting for roughly 60–65% of total expenses across all years. This suggests a cost-intensive operation, typical in manufacturing or production-heavy sectors.
+
+3. **SG&A Shows Gradual Growth**
+Selling, General & Administrative (SG&A) expenses maintain a consistent but slower upward trajectory, implying controlled administrative spending relative to revenue growth.
+
+4. **Depreciation Grows Slightly but Remains Minimal**
+The Depreciation portion (green band) is small yet increases slightly, possibly due to new capital investments or asset acquisitions over time.
+
+5. **Expense Composition Stability**
+The proportions among COGS, SG&A, and Depreciation remain fairly stable — suggesting predictable cost behavior and no major structural changes in the company’s expense base.
+
+```{r, echo=FALSE, warning=FALSE}
+# Filter only expense items and make values positive
+expense_data <- income_long %>%
+  filter(Item %in% c(
+    "COGS",
+    "SG&A",
+    "Depreciation"
+  )) %>%
+  mutate(Value = abs(Value))   # convert negatives to positives for visualization
+
+# Create stacked area chart
+ggplot(expense_data, aes(x = Year, y = Value, fill = Item, group = Item)) +
+  geom_area(alpha = 0.85) +
+  scale_fill_manual(
+    values = c(
+      "COGS" = "#1F77B4",        
+      "SG&A" = "#FF7F0E",        
+      "Depreciation" = "#2CA02C")) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),  # Adds dollar sign and 'M'
+    name = "USD (millions)") +
+  labs(
+    title = "Expense Breakdown Over Time (2024–2028)",
+    subtitle = "COGS, SG&A, and Depreciation (in USD millions)",
+    x = "Year", fill = "Expense Type") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"))
+```
+
+\newpage
+
+### Key Insights - Operating vs Net Income (2024–2028)
+
+1. **Consistent Upward Trend**
+Both Operating Profit and Net Income show a steady increase from 2024 to 2028, indicating sustained business growth and improved operational performance.
+
+2. **Healthy Operating Margins**
+Operating Profit remains consistently higher than Net Income each year, which is expected since it excludes interest and taxes. The gap between the two metrics appears moderate and stable, reflecting controlled financing and tax expenses.
+
+3. **Improving Profitability Efficiency**
+The narrowing gap between Operating Profit and Net Income in later years (2027–2028) suggests improved cost management and possibly more favorable financing or tax conditions.
+
+4. **Strong Financial Outlook**
+By 2028, both metrics reach their highest levels, signaling robust profitability and a positive long-term financial trajectory, with Net Income approaching $45M and Operating Profit nearing $55M.
+
+```{r, echo=FALSE, warning=FALSE}
+
+income_long %>%
+  filter(Item %in% c("Operating Profit", "Net Income")) %>%
+  ggplot(aes(x = Year, y = Value, fill = Item)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.9) +
+  scale_fill_manual(
+    values = c("Operating Profit" = "#1F77B4","Net Income"= "#2CA02C")) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),  # Adds dollar sign and 'M'
+    name = "USD (millions)") +
+  labs(
+    title = "Operating vs Net Income (2024–2028)",
+    x = "Year",
+    fill = "Financial Metric") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"))
+
+```
+
+\newpage
+
+### Key Insights - Income Breakdown for 2024 & 2025 (Waterfall View)
+
+* Revenue grows steadily from $198M to $208M (+5%), while Net Income holds around $27M, indicating stable profitability.
+* COGS and SG&A rise slightly but remain proportional to revenue, showing good cost control.
+* Gross and Operating Profit improve modestly, reflecting consistent operational efficiency.
+* Overall, the company maintains steady growth, stable margins, and predictable expense trends — a sign of strong financial discipline.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=8}
+
+# Prepare data
+waterfall_all <- income_long %>%
+  mutate(
+    Year = factor(Year, levels = c("2024", "2025", "2026", "2027", "2028")),
+    Item = factor(Item, levels = unique(Item))
+  )
+
+# Waterfall chart faceted by year (5 rows, 1 column)
+ggplot(waterfall_all %>% 
+  filter(Year %in% c("2024", "2025")), aes(x = Item, y = Value, fill = Value > 0)) +
+  geom_col() +
+  geom_text(aes(label = dollar(Value, prefix = "$", suffix = "M")), vjust = -0.4, size = 2.5) +
+  facet_wrap(~ Year, ncol = 1) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),
+    name = "USD (millions)"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "FALSE" = "#D62728",
+      "TRUE"  = "#2CA02C"
+    ),
+    name = "Value Sign",
+    labels = c("Negative", "Positive")
+  ) +
+  labs(
+    title = "",
+    subtitle = "Each panel shows the Income Statement flow for that year",
+    x = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_blank(),        # ✅ move these outside of element_text()
+    axis.ticks.y = element_blank(),
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11)
+  )
+
+
+```
+
+\newpage
+
+### Key Insights - Income Breakdown for 2026, 2027 & 2028 (Waterfall View)
+
+* Revenue Growth: Revenue rises steadily from $223M in 2026 to $248M in 2028, showing consistent expansion.
+* Cost Control: COGS and SG&A grow proportionally, reflecting strong expense management.
+* Operating Efficiency: Operating profit increases from $47M to $57M, indicating better efficiency.
+* Profitability: Net income climbs from $35M to $43M, maintaining healthy margins.
+* Financial Strength: Overall results show sustainable growth and disciplined cost control.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=8}
+
+# Waterfall chart faceted by year (5 rows, 1 column)
+ggplot(waterfall_all %>% 
+  filter(Year %in% c("2026", "2027", "2028")), aes(x = Item, y = Value, fill = Value > 0)) +
+  geom_col() +
+  geom_text(aes(label = dollar(Value, prefix = "$", suffix = "M")), vjust = -0.4, size = 2.5) +
+  facet_wrap(~ Year, ncol = 1) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),
+    name = "USD (millions)"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "FALSE" = "#D62728",
+      "TRUE"  = "#2CA02C"
+    ),
+    name = "Value Sign",
+    labels = c("Negative", "Positive")
+  ) +
+  labs(
+    title = "",
+    subtitle = "Each panel shows the Income Statement flow for that year",
+    x = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_blank(),        # ✅ move these outside of element_text()
+    axis.ticks.y = element_blank(),
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11)
+  )
+
+
+```
+
+
+\newpage
+
+## Balance Sheet Analysis and Capital Structure Trends
+
+The Balance Sheet provides a snapshot of the company’s financial position from 2023 to 2028, showing how assets, liabilities, and equity evolve over time. Total assets increase steadily from $82M to $177M, driven by growth in cash, receivables, and fixed assets. Liabilities remain relatively stable, indicating controlled leverage, while shareholders’ equity expands consistently—reflecting retained earnings and sustained profitability.
+Overall, the company demonstrates a strong and balanced financial structure, with asset growth supported by stable debt levels and increasing equity, ensuring long-term solvency and financial resilience.
+
+```{r, echo=FALSE, warning=FALSE}
+balance_s <- read_csv("statement_fin.csv", skip = 14, n_max = 6, show_col_types = FALSE)
+
+balance_s %>%
+  mutate(across(-1, ~ dollar(as.numeric(.), accuracy = 1))) %>%
+  flextable() %>%
+  set_caption("Balance Sheet (2023–2028)") %>%
+  theme_vanilla() %>%
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  fontsize(size = 8.5, part = "all") %>%  # 🔹 Smaller font for entire table
+  autofit()
+
+```
+
+\newpage
+
+### Key Insights - Total Assets Growth (2023–2028)
+
+
+1. **Consistent Growth:** Total assets increase steadily each year from 2023 to 2028, indicating continuous business expansion.
+
+2. **Strong Asset Base:** The asset base grows from roughly $82M in 2023 to about $177M in 2028, more than doubling over five years.
+
+3. **Capital Investment:** The upward trend suggests reinvestment in long-term assets such as property, equipment, and working capital.
+
+4. **Financial Stability:** The smooth growth pattern reflects effective balance sheet management with no volatility in asset accumulation.
+
+5. **Foundation for Scalability:** The steady increase in total assets positions the company for sustainable future growth and greater financial leverage.
+
+```{r, echo=FALSE, warning=FALSE}
+
+
+colnames(balance_s) <- c("Item", "2023", "2024", "2025", "2026", "2027", "2028")
+
+
+# Step 3: Convert from wide to long format
+balance_long <- balance_s %>%
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "Year",
+    values_to = "Value"
+  ) %>% 
+  mutate(
+    Type = if_else(Year == "2023", "Actual", "Forecast")
+  )
+
+
+# Total Assets Trend
+# Measures expansion of the balance sheet and asset base
+balance_long %>%
+  filter(Item == "Total Assets") %>%
+  ggplot(aes(x = Year, y = Value, group = 1)) +
+  # Light fill under the line for visual depth
+  geom_area(fill = "#1F77B4", alpha = 0.15) +
+  geom_line(color = "#1F77B4", size = 1.3) +
+  geom_point(size = 3, color = "#1F77B4") +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),  # Adds $ and 'M'
+    name = "USD (millions)"
+  ) +
+  labs(
+    title = "Total Assets Growth (2023–2028)",
+    subtitle = "Steady year-over-year increase in asset base",
+    x = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "gray40"),
+    plot.caption = element_text(size = 9, color = "gray50", hjust = 1),
+    axis.title.y = element_text(color = "#1F77B4", face = "bold")
+  )
+```
+
+\newpage
+
+### Key Insights - Asset Composition: Current vs Non-Current (2023–2028)
+
+1. **Strong Asset Expansion:** Total assets steadily increase each year, reflecting consistent investment and business growth.
+
+
+2. **Current Assets Leading Growth:** The sharp rise in total current assets indicates improved liquidity and stronger short-term financial health.
+
+
+3. **Stable Non-Current Assets:** Property, Plant & Equipment (PPE) grows modestly, suggesting controlled capital expenditure.
+
+
+4. **Shifting Composition:** The share of current assets expands relative to PPE, implying a gradual move toward a more flexible, liquid balance sheet.
+
+
+5. **Operational Efficiency:** The balanced growth between asset classes points to disciplined asset management and sustainable financial scaling.
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+assets_comp <- balance_long %>%
+  mutate(Item = str_trim(Item)) %>%                              # remove extra spaces
+  filter(str_detect(Item, "Current Assets") |                    # keep only asset-related rows
+           str_detect(Item, "Property") | 
+           str_detect(Item, "Plant")) %>% 
+  mutate(
+    # standardize category names
+    Item = case_when(
+      str_detect(Item, "Current Assets") ~ "Total Current Assets",
+      str_detect(Item, "Property") | str_detect(Item, "Plant") ~ "Property, Plant & Equipment",
+      TRUE ~ Item
+    ),
+    Item = factor(Item, levels = c("Total Current Assets", "Property, Plant & Equipment"))
+  )
+
+# --- 2. Plot stacked area chart with Tableau colors ---
+ggplot(assets_comp, aes(x = Year, y = Value, fill = Item, group = Item)) +
+  geom_area(alpha = 0.9, color = "white", size = 0.2) +
+  scale_fill_manual(
+    values = c(
+      "Total Current Assets" = "#1F77B4",  # Tableau Blue
+      "Property, Plant & Equipment" = "#7F7F7F"  # Tableau Gray
+    ),
+    name = "Asset Type"
+  ) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),  # Adds dollar sign
+    name = "USD (millions)"
+  ) +
+  labs(
+    title = "Asset Composition: Current vs Non-Current \n(2023–2028)",
+    subtitle = "Total Current Assets vs Property, Plant & Equipment",
+    x = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold")
+  )
+
+```
+
+\newpage
+
+### Key Insights - Working Capital Components (2023–2028)
+
+1. **Cash Dominance:** Cash and cash equivalents show rapid growth, becoming the largest component of working capital by a wide margin.
+
+
+2. **Improved Liquidity:** The steady rise in cash indicates strengthened liquidity and financial flexibility over time.
+
+
+3. **Stable Receivables:** Accounts receivable increase moderately, reflecting controlled credit terms and efficient collections.
+
+
+4. **Balanced Inventory:** Inventory levels remain relatively flat, suggesting effective inventory management and lean operations.
+
+
+5. **Operational Strength:** The consistent upward trend across all components highlights healthy cash conversion and efficient working capital utilization.
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+balance_long %>%
+  filter(Item %in% c("Cash & Cash Equivalents", "Accounts Receivable", "Inventory")) %>%
+  ggplot(aes(x = Year, y = Value, color = Item, group = Item)) +
+  geom_line(size = 1.3) +
+  geom_point(size = 3) +
+scale_color_manual(
+  values = c(
+    "Cash & Cash Equivalents" = "#1F77B4",  
+    "Accounts Receivable"     = "#FF7F0E",  
+    "Inventory"               = "#2CA02C"
+  ),
+  name = "Working Capital Item",
+  labels = c(
+    "Cash &\nCash Equivalents",    # ⬅️ manual line break
+    "Accounts\nReceivable",
+    "Inventory"
+  )
+) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M"),
+    name = "USD (millions)") +
+  labs(
+    title = "Working Capital Components (2023–2028)",
+    subtitle = "Tracking liquidity drivers: cash, receivables, and inventory",
+    x = "Year") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"))
+
+
+```
+
+\newpage
+
+### Key Insights - Current Assets as % of Total Assets (2023–2028)
+
+1. **Rising Liquidity:** Current assets grow from roughly 40% to nearly 70% of total assets, showing a clear shift toward liquidity.
+
+2. **Stronger Short-Term Position:** The trend indicates the company is holding more assets in cash, receivables, or inventory relative to fixed assets.
+
+3. **Improved Financial Flexibility:** Higher current asset ratios enhance the firm’s ability to meet short-term obligations.
+
+4. **Reduced Capital Intensity:** The declining proportion of non-current assets suggests lower reliance on long-term investments.
+
+5. **Healthy Balance Sheet:** The upward slope reflects sound asset management and a focus on maintaining operational resilience.
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+balance_long %>%
+  filter(Item %in% c("Total Current Assets", "Total Assets")) %>%
+  pivot_wider(names_from = Item, values_from = Value) %>%
+  mutate(Current_Assets_Pct = `Total Current Assets` / `Total Assets`) %>%
+  ggplot(aes(x = Year, y = Current_Assets_Pct, group = 1)) +
+  geom_area(fill = "#2CA02C", alpha = 0.2) +  # Light Tableau green area
+  geom_line(color = "#2CA02C", size = 1.3) +  # Tableau Green line
+  geom_point(color = "#2CA02C", size = 3) +   # Tableau Green points
+  scale_y_continuous(
+    labels = percent_format(accuracy = 1),    # Adds % sign
+    name = "Current Assets (% of Total Assets)"
+  ) +
+  labs(
+    title = "Current Assets as % of Total Assets (2023–2028)",
+    subtitle = "Liquidity structure of the balance sheet",
+    x = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    axis.title.y = element_text(face = "bold", color = "#2CA02C")
+  )
+
+```
+
+\newpage
+
+## Cash Flow Analysis: Operating, Investing, and Financing Activities (2024–2028)
+
+The Cash Flow Analysis section illustrates how the company generates and uses cash across operating, investing, and financing activities from 2024 to 2028. It highlights the firm’s ability to convert profits into cash, manage capital expenditures, and balance financing decisions. Operating inflows reflect efficiency and earnings quality, while investing outflows show long-term growth commitments. Financing activities reveal how capital is raised or distributed. Together, these insights show how liquidity supports expansion, debt management, and shareholder returns, providing a comprehensive view of financial sustainability and cash discipline.
+
+```{r, echo=FALSE, warning=FALSE}
+
+# Step 1: Read the CSV – start at A39, ignore column B, and include Net Income
+cashflow_s <- suppressMessages(
+  read_csv("statement_fin.csv", skip = 37, n_max = 28, show_col_types = FALSE)
+)
+
+# Step 2: Drop the empty column B (2nd column)
+cashflow_s <- cashflow_s %>% select(-2)
+
+# Step 3: Rename columns
+colnames(cashflow_s) <- c("Item", "2023", "2024", "2025", "2026", "2027", "2028")
+
+cashflow_na <- cashflow_s %>% drop_na()
+
+cashflow_na <- cashflow_na %>% slice(-10,-11,-12) 
+
+cashflow_na %>%
+  mutate(
+    across(
+      c(`2023`, `2024`, `2025`, `2026`, `2027`),
+      ~ {
+        num <- suppressWarnings(as.numeric(gsub(",", "", .)))
+        ifelse(
+          Item %in% c("Years", "Units Sold", "COGS as a % of Rev"),
+          .,  # Leave these rows as is
+          ifelse(
+            !is.na(num) & num < 0,
+            paste0("-$", formatC(abs(num), big.mark = ",", format = "f", digits = 0)),  # Negatives
+            ifelse(!is.na(num),
+                   paste0("$", formatC(num, big.mark = ",", format = "f", digits = 0)),  # Positives
+                   .)
+          )
+        )
+      }
+    )
+  ) %>%
+  slice(-1, -15) %>%
+  flextable() %>%
+  set_caption("Cash Flow Statement (2023–2027)") %>%
+  theme_vanilla() %>%
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  align(align = "right", part = "body") %>%
+  fontsize(size = 9, part = "all") %>%
+  autofit()
+
+```
+
+\newpage
+
+### Key Insights - Cash Flow Dashboard (2023–2027)
+
+1. Operating cash flow remains the strongest source of liquidity, growing steadily each year and providing consistent positive inflows.
+
+2. Investing activities show continuous outflows tied to capital expenditures, reflecting ongoing reinvestment in long-term assets.
+
+3. Financing cash flow turns increasingly negative, indicating regular debt repayments and dividend distributions to shareholders.
+
+4. Net cash flow (black line) stays positive throughout, showing strong internal cash generation despite investment and financing outflows.
+
+5. Ending cash balance (gray dashed line) trends upward, demonstrating solid liquidity accumulation and prudent financial management.
+
+```{r, echo=FALSE, warning=FALSE}
+
+cashflow_long <- cashflow_s %>%
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "Year",
+    values_to = "Value"
+  )
+
+# Step 5: Clean extra empty rows (if any)
+cashflow_long <- cashflow_long %>% filter(!is.na(Item) & Item != "")
+
+cf_chart <- cashflow_long %>%
+  filter(Item %in% c(
+    "Cash Flow from Operating Activities",
+    "Cash Flow from Investing Activities",
+    "Cash Flow from Financing Activities",
+    "End of Year Cash Balance"
+  )) %>%
+  mutate(
+    Year = as.numeric(Year),
+    Value = as.numeric(gsub(",", "", Value))
+  )
+
+# Pivot wider to calculate totals
+cf_wide <- cf_chart %>%
+  filter(Item != "End of Year Cash Balance") %>%
+  tidyr::pivot_wider(names_from = Item, values_from = Value) %>%
+  mutate(
+    Net_Cash_Change = `Cash Flow from Operating Activities` +
+      `Cash Flow from Investing Activities` +
+      `Cash Flow from Financing Activities`
+  ) %>%
+  left_join(
+    cf_chart %>%
+      filter(Item == "End of Year Cash Balance") %>%
+      select(Year, End_of_Year_Cash = Value),
+    by = "Year"
+  )
+
+# --- 2. Plot ---
+ggplot(cf_wide, aes(x = factor(Year))) +
+  # Bars first
+  geom_col(aes(y = `Cash Flow from Operating Activities`, fill = "Operating")) +
+  geom_col(aes(y = `Cash Flow from Investing Activities`, fill = "Investing")) +
+  geom_col(aes(y = `Cash Flow from Financing Activities`, fill = "Financing")) +
+
+  # Lines *after* bars to appear on top
+  geom_line(aes(y = Net_Cash_Change, color = "Net Cash", group = 1), size = 1.2) +
+  geom_point(aes(y = Net_Cash_Change, color = "Net Cash"), size = 3) +
+  geom_line(aes(y = End_of_Year_Cash, color = "Ending Cash", group = 1),
+            size = 1, linetype = "dashed") +
+
+  # Color and fill legends
+  scale_fill_manual(
+    name = "Cash Flow Type",
+    values = c("Operating" = "#2CA02C", "Investing" = "#D62728", "Financing" = "#1F77A1")
+  ) +
+  scale_color_manual(
+    name = "Line Items",
+    values = c("Net Cash" = "black", "Ending Cash" = "gray40")
+  ) +
+
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M", big.mark = ","),
+    name = "USD (millions)"
+  ) +
+  labs(
+    title = "Cash Flow Dashboard (2023–2027)",
+    subtitle = "Operating, Investing, and Financing Activities with Net Cash Change",
+    x = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    legend.box = "vertical",
+    legend.text = element_text(size = 10)
+  )
+
+
+```
+
+\newpage
+
+### Key Inisghts - Change in Cash – 2027
+
+1. The company began 2027 with $71.8M in cash.
+2. Operating activities provided strong inflows of $52.4M, the primary source of cash generation.
+3. Investing activities consumed $7.5M, reflecting moderate capital expenditures and reinvestment in long-term assets.
+4. Financing activities recorded an outflow of $25M, driven by debt repayments and dividend distributions.
+5. The year closed with an ending cash balance of $91.8M, highlighting solid liquidity despite ongoing investment and shareholder returns.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=6}
+
+# --- Step 1: Prepare Data ---
+cf_waterfall <- cf_wide %>%
+  filter(Year == 2027) %>%
+  select(`Cash Flow from Operating Activities`,
+         `Cash Flow from Investing Activities`,
+         `Cash Flow from Financing Activities`,
+         End_of_Year_Cash) %>%
+  pivot_longer(cols = everything(),
+               names_to = "Category",
+               values_to = "Value") %>%
+  mutate(
+    Category = recode(Category,
+                      `Cash Flow from Operating Activities` = "Operating Activities",
+                      `Cash Flow from Investing Activities` = "Investing Activities",
+                      `Cash Flow from Financing Activities` = "Financing Activities",
+                      End_of_Year_Cash = "Ending Cash"),
+    Type = case_when(
+      Category == "Operating Activities" ~ "Inflow",
+      Category == "Ending Cash" ~ "Ending",
+      TRUE ~ "Outflow"))
+
+# --- Step 2: Add Beginning Cash ---
+begin_cash <- cf_wide %>%
+  filter(Year == 2027) %>%
+  mutate(Beginning_Cash = End_of_Year_Cash -
+           (`Cash Flow from Operating Activities` +
+              `Cash Flow from Investing Activities` +
+              `Cash Flow from Financing Activities`)) %>%
+  pull(Beginning_Cash)
+
+cf_waterfall <- bind_rows(
+  tibble(Category = "Beginning Cash", Value = begin_cash, Type = "Start"),
+  cf_waterfall)
+
+# --- Step 3: Compute Cumulative Positions ---
+cf_waterfall <- cf_waterfall %>%
+  mutate(
+    id = row_number(),
+    ymin = lag(cumsum(Value), default = 0),
+    ymax = cumsum(Value))
+
+# --- Step 4: Plot ---
+ggplot(cf_waterfall, aes(x = id, fill = Type)) +
+  geom_rect(aes(xmin = id - 0.4, xmax = id + 0.4, ymin = ymin, ymax = ymax),
+            color = "white") +
+  geom_text(aes(x = id, y = (ymin + ymax) / 2,
+    label = dollar(Value, prefix = "$", big.mark = ",")),
+  size = 3.2, fontface = "bold", color = "black") +
+  scale_x_continuous(
+    breaks = cf_waterfall$id,
+    labels = cf_waterfall$Category,
+    expand = c(0.02, 0.02)) +
+  scale_y_continuous(labels = dollar_format(prefix = "$", big.mark = ",")) +
+  scale_fill_manual(values = c(
+    "Start"  = "#1F77B4",  # Tableau Blue
+    "Inflow" = "#2CA02C",  # Tableau Green
+    "Outflow"= "#D62728",  # Tableau Red
+    "Ending" = "#9467BD"   # Tableau Purple (deep tone, replacing dark blue)
+  )) +
+  labs(
+    title = "Change in Cash – 2027",
+    subtitle = "Cumulative view of operating inflows, investing and financing outflows",
+    x = "", y = "USD (millions)",
+    fill = "") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+
+```
+
+The same waterfall structure can be applied to the remaining years to provide a consistent view of cash movements across the forecast period, helping identify how shifts in operating performance, capital investments, and financing decisions impact overall liquidity trends year by year.
+
+\newpage
+
+### Key Insights - Cash Flow Composition by Activity (2023–2027)
+
+* **Operating activities** consistently generate strong positive cash flows, serving as the company’s primary source of liquidity.
+
+* **Operating inflows** grow steadily over the projection period, highlighting efficient earnings conversion and solid core business performance.
+
+* **Investing activities** remain negative throughout, reflecting continuous capital expenditures and long-term reinvestment—a sign of strategic growth.
+
+* **Financing activities** show sustained outflows, consistent with debt repayments and dividend distributions to shareholders.
+
+* The **overall cash flow structure** is balanced and sustainable, with robust operating inflows offsetting investing and financing outflows.
+
+* This pattern demonstrates **financial strength, liquidity expansion, and long-term resilience** in cash management.
+
+\vspace{1cm}
+
+```{r, echo=FALSE, warning=FALSE}
+# Clean numeric values (remove commas and %)
+cf_clean <- cashflow_long %>%
+  mutate(
+    Year = as.numeric(Year),
+    Value = str_replace_all(Value, ",", ""),     # remove commas
+    Value = str_replace_all(Value, "%", ""),     # remove % signs
+    Value = as.numeric(Value)
+  )
+
+cf_clean %>%
+  filter(Item %in% c(
+    "Cash Flow from Operating Activities",
+    "Cash Flow from Investing Activities",
+    "Cash Flow from Financing Activities")) %>%
+  ggplot(aes(x = factor(Year), y = Value, fill = Item)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c(
+      "Cash Flow from Operating Activities" = "#2CA02C",  # Tableau Green
+      "Cash Flow from Investing Activities" = "#D62728",  # Tableau Red
+      "Cash Flow from Financing Activities" = "#1F77B4"   # Tableau Blue
+    ),
+    guide = guide_legend(ncol = 1)  # ⬅️ Legend items stacked vertically
+  ) +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M", big.mark = ",")
+  ) +
+  labs(
+    title = "Cash Flow Composition by Activity \n(2023–2027)",
+    x = "Year",
+    y = "USD (millions)",
+    fill = "Cash Flow Type"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    axis.title.y = element_text(face = "bold", color = "#1F77B4"),
+    legend.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+```
+
+\newpage
+
+### Key Insights - Cumulative Cash Balance (2023–2027)
+
+* **Ending cash balance** shows a consistent and accelerating increase from $21 million in 2023 to over $90 million by 2027.
+
+* The steady growth indicates **strong cash generation from operations** and efficient internal funding capacity.
+
+* **Disciplined investment management** helps preserve liquidity while supporting ongoing capital needs.
+
+* **Controlled financing outflows** (such as debt repayments and dividends) contribute to stable cash retention.
+
+* The upward trajectory highlights **enhanced financial resilience** and expanding liquidity reserves.
+
+* The company is well-positioned to **fund future growth, pursue strategic investments, or improve balance sheet flexibility** in upcoming years.
+
+\vspace{1cm}
+
+```{r, echo=FALSE, warning=FALSE}
+
+cf_clean %>%
+  filter(Item == "End of Year Cash Balance") %>%
+  ggplot(aes(x = Year, y = Value, group = 1)) +
+  geom_area(fill = "#1F77B4", alpha = 0.15) +   # Light blue area (Tableau)
+  geom_line(color = "#1F77B4", size = 1.3, linetype = "dashed") +
+  geom_point(size = 3, color = "#1F77B4") +
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M", big.mark = ","),
+    name = "USD (millions)"
+  ) +
+  labs(
+    title = "Cumulative Cash Balance (2023–2027)",
+    subtitle = "Represents ending cash position after all operating, investing, and financing activities",
+    x = "Year"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    axis.title.y = element_text(face = "bold", color = "#1F77B4")
+  )
+
+```
+
+\newpage
+
+### Key Insights - Operating Efficiency Ratios (COGS% and SG&A%)
+
+This Operating Efficiency Ratios (COGS% and SG&A%) chart shows a steady improvement in cost structure efficiency from 2023 to 2027.
+
+* COGS as a % of Revenue decreases gradually from around 43% to 38%, indicating that the company is producing goods more efficiently or benefiting from economies of scale.
+
+* The downward trend suggests better control over direct production costs relative to revenue growth — possibly due to process optimization, supplier negotiations, or higher-margin products.
+
+* The stabilization of COGS near 38% after 2026 implies the company has reached a more sustainable and optimized cost base.
+
+```{r, echo=FALSE, warning=FALSE}
+
+cf_clean %>%
+  filter(Item %in% c("COGS as a % of Rev", "SG&A as a % of Rev")) %>%
+  ggplot(aes(x = Year, y = Value, color = Item, group = Item)) +
+  geom_area(
+    data = filter(cf_clean, Item == "COGS as a % of Rev"),
+    aes(x = Year, y = Value, fill = Item),
+    alpha = 0.15, inherit.aes = FALSE
+  ) +
+  geom_line(size = 1.3) +
+  geom_point(size = 3) +
+  scale_y_continuous(
+    labels = function(x) paste0(x, "%"),
+    name = "% of Revenue"
+  ) +
+  scale_color_manual(
+    values = c(
+      "COGS as a % of Rev" = "#D62728",  # Tableau Red
+      "SG&A as a % of Rev" = "#1F77B4"),
+    name = "Operating Ratio") +
+  scale_fill_manual(
+    values = c("COGS as a % of Rev" = "#D62728"), guide = "none") +
+  labs(
+    title = "Operating Efficiency Ratios (COGS% and SG&A%)",
+    subtitle = "Tracking cost structure efficiency over time",
+    x = "Year") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    axis.title.y = element_text(face = "bold", color = "#1F77B4"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"))
+
+```
+
+\newpage
+
+### Key Insights - Free Cash Flow vs Operating and CapEx (2023–2027)
+
+* **Operating cash inflows** (green line) show steady year-over-year growth, indicating consistent profitability and efficient operations.
+
+* **Capital expenditures (CapEx)** (red dashed line) remain negative but moderate over time, signaling ongoing reinvestment in long-term assets without excessive strain on liquidity.
+
+* Free cash flow** (blue bars) increases strongly across the period, highlighting the company’s improving ability to convert earnings into cash after funding capital investments.
+
+* The widening gap between **operating inflows and CapEx** reflects growing internal funding capacity—reducing dependency on external financing.
+
+* Overall, the trend suggests a **healthy, self-sustaining cash generation cycle**, supporting both reinvestment and potential shareholder returns.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=6}
+
+cf_clean %>%
+  filter(Item %in% c("Cash Flow from Operating Activities", "Capital Expenditures")) %>%
+  pivot_wider(names_from = Item, values_from = Value) %>%
+  mutate(
+    Free_Cash_Flow = `Cash Flow from Operating Activities` + `Capital Expenditures`) %>%
+  pivot_longer(
+    cols = c("Free_Cash_Flow", "Cash Flow from Operating Activities", "Capital Expenditures"),
+    names_to = "Metric",
+    values_to = "Amount") %>%
+  ggplot(aes(x = factor(Year), y = Amount, group = Metric)) +
+  geom_col(
+    data = . %>% filter(Metric == "Free_Cash_Flow"),
+    aes(fill = Metric),
+    alpha = 0.8) +
+  geom_line(
+    data = . %>% filter(Metric != "Free_Cash_Flow"),
+    aes(color = Metric, linetype = Metric),
+    size = 1.3) +
+  scale_fill_manual(
+    values = c("Free_Cash_Flow" = "#1F77B4"),
+    labels = c("Free Cash Flow")) +
+  scale_color_manual(
+    values = c(
+      "Cash Flow from Operating Activities" = "#2CA02C",
+      "Capital Expenditures" = "#D62728"),
+    labels = c("Operating Activities", "Capital Expenditures")) +
+  scale_linetype_manual(
+    values = c(
+      "Cash Flow from Operating Activities" = "solid",
+      "Capital Expenditures" = "dashed"),
+    labels = c("Operating Activities", "Capital Expenditures")) +
+  scale_y_continuous(
+    labels = scales::dollar_format(prefix = "$", suffix = "M", big.mark = ","),
+    name = "USD (millions)") +
+  labs(
+    title = "Free Cash Flow vs Operating and CapEx (2023–2027)",
+    subtitle = "Comparing operating cash inflows with capital spending to reveal free cash flow trends",
+    x = "Year",
+    color = "Legend",
+    fill = "Legend",
+    linetype = "Legend") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    axis.title.y = element_text(face = "bold", color = "#1F77B4"),
+    legend.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    legend.direction = "horizontal",   # ✅ Single vertical legend
+    legend.box = "vertical",         # ✅ Keep all items in one column
+    legend.justification = "center"
+  )
+```
+
+## Financial Model Assumptions (2023–2027)
+
+This section outlines the key assumptions driving the company’s financial projections. It defines the operational, income statement, and balance sheet parameters that underpin revenue growth, cost efficiency, and financing structure. The inputs—such as unit sales, pricing, cost ratios, and tax rates—serve as the foundation for all financial statements and cash flow forecasts. These assumptions ensure model transparency, facilitate scenario analysis, and provide a structured basis for evaluating financial performance under consistent, data-driven parameters.
+
+```{r, echo=FALSE, warning=FALSE}
+# Step 1: Read CSV (skip first 61 rows to start at A62)
+income_assumptions <- read_csv("statement_fin.csv", skip = 61, n_max = 11, show_col_types = FALSE)
+
+# Step 2: Drop any blank columns (like empty column B)
+income_assumptions <- income_assumptions %>% select(-2)
+
+income_assumptions %>% drop_na() %>% View()
+
+# Step 3: Rename columns (A62:G72 = 1 label + 6 years)
+colnames(income_assumptions) <- c("Item", "2024", "2025", "2026", "2027", "2028")
+
+# Step 4: Reshape to long format
+income_assumptions_long <- income_assumptions %>%
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "Year",
+    values_to = "Value"
+  )
+
+income_assumptions %>%
+  drop_na() %>%
+  mutate(
+    across(
+      c(`2024`, `2025`, `2026`, `2027`, `2028`),
+      ~ ifelse(
+        Item %in% c("Price per Unit", "Revenue", "COGS") & !is.na(.),
+        dollar(as.numeric(gsub(",", "", .)), accuracy = 1),
+        .
+      )
+    )
+  ) %>%
+  flextable() %>%
+  set_caption("Table 5: Key Income Statement Assumptions (2024–2028)") %>%
+  theme_vanilla() %>%
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  align(align = "right", part = "body") %>%
+  fontsize(size = 9, part = "all") %>%
+  autofit()
+```
+
+\newpage
+
+### Key Insights - Revenue Growth Projection (2024–2028)
+
+* **Steady Upward Trend:** Revenue grows consistently year over year, rising from approximately $198 million in 2024 to nearly $248 million by 2028, indicating sustained business expansion.
+
+* **Healthy Growth Rate:** The gradual slope reflects stable and predictable growth, suggesting effective pricing strategies, increased sales volume, or both.
+
+* **Underlying Drivers:** Growth aligns with forecasted increases in units sold and maintained price per unit, demonstrating strong market demand and pricing stability.
+
+* **Operational Strength:** The upward revenue trajectory complements improving cost efficiency (lower COGS %) observed in prior charts, reinforcing profitability potential.
+
+* **Strategic Outlook:** This pattern highlights a solid foundation for long-term scalability, with revenue momentum supporting further investments, debt servicing, and shareholder value creation.
+
+```{r, echo=FALSE, warning=FALSE}
+
+# Clean values: remove commas and percent signs, convert to numeric
+assumptions_clean <- income_assumptions_long %>%
+  mutate(
+    Year = as.numeric(Year),
+    Value = str_replace_all(Value, ",", ""),
+    Value = str_replace_all(Value, "%", ""),
+    Value = as.numeric(Value)
+  )
+
+
+assumptions_clean %>%
+  filter(Item == "Revenue") %>%
+  ggplot(aes(x = Year, y = Value, group = 1)) +
+  
+  # Light blue growth area
+  geom_area(fill = "#1F77B4", alpha = 0.15) +
+  
+  # Revenue growth line and points
+  geom_line(color = "#1F77B4", size = 1.3) +
+  geom_point(size = 3, color = "#1F77B4") +
+  
+  # Axis formatting
+  scale_y_continuous(
+    labels = dollar_format(prefix = "$", suffix = "M", big.mark = ","),
+    name = "USD (millions)"
+  ) +
+  
+  # Labels and theme
+  labs(
+    title = "Revenue Growth Projection (2024–2028)",
+    subtitle = "Expected annual revenue increase based on forecast assumptions",
+    caption = "Source: Company Financial Model (Data Mex Labs projection)",
+    x = "Year"
+  ) +
+  
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    plot.caption = element_text(size = 9, hjust = 1, color = "gray50"),
+    axis.title.y = element_text(face = "bold", color = "#1F77B4")
+  )
+
+
+```
+
+\newpage
+
+### Key Insights - Cost Efficiency Ratios (as % of Revenue)
+
+* **Improving Production Efficiency:**
+The COGS-to-revenue ratio decreases from 43% in 2024–2025 to 38% by 2027–2028, reflecting better cost control, operational optimization, and possibly economies of scale as production volumes grow.
+
+* **Stable Overhead Costs:**
+SG&A expenses remain constant at 35% of revenue across all years, indicating disciplined management of administrative and marketing expenditures, despite increasing revenue.
+
+* **Expanding Margins:**
+The combined decline in COGS with stable SG&A suggests improving gross and operating margins, supporting enhanced profitability potential.
+
+* **Operational Leverage in Action:**
+As revenue increases while cost ratios stabilize or decline, the company demonstrates strong operating leverage — a positive sign of scalability and efficient cost absorption.
+
+* **Strategic Implication:**
+These cost efficiency trends show a well-balanced financial structure, where growth is supported by productivity improvements rather than higher spending, positioning the firm for sustainable long-term margin expansion.
+
+```{r, echo=FALSE, warning=FALSE}
+
+assumptions_clean %>%
+  filter(Item %in% c("COGS as a % of Rev", "SG&A as a % of Rev")) %>%
+  ggplot(aes(x = Year, y = Value, color = Item, group = Item)) +
+  geom_area(
+    data = filter(assumptions_clean, Item == "COGS as a % of Rev"),
+    aes(x = Year, y = Value, fill = Item),
+    alpha = 0.15, inherit.aes = FALSE
+  ) +
+  geom_line(size = 1.3) +
+  geom_point(size = 3) +
+  scale_y_continuous(
+    labels = function(x) paste0(x, "%"),
+    name = "Percentage of Revenue") +
+  scale_color_manual(
+    values = c(
+      "COGS as a % of Rev" = "#D62728",  
+      "SG&A as a % of Rev" = "#2CA02C"),
+    name = "Cost Type") +
+  scale_fill_manual(
+    values = c("COGS as a % of Rev" = "#D62728"), guide = "none") +
+  labs(
+    title = "Cost Efficiency Ratios (as % of Revenue)",
+    subtitle = "Comparing production and overhead costs as a share of total revenue",
+    x = "Year") +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
+    axis.title.y = element_text(face = "bold", color = "#D62728"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"))
+
+```
+
